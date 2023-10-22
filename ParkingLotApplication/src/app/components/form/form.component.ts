@@ -1,43 +1,87 @@
-import { Component, Input } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnDestroy,
+  Output,
+} from '@angular/core';
+import { Subject, takeUntil } from 'rxjs';
+import { ApiService } from 'src/app/services/api.service';
 
 @Component({
   selector: 'app-form',
   templateUrl: './form.component.html',
   styleUrls: ['./form.component.scss'],
 })
-export class FormComponent {
-  @Input() sectionName: string = 'Check-In';
+export class FormComponent implements OnDestroy {
+  @Input() sectionName!: string;
+  @Output() fareCalculated: EventEmitter<number> = new EventEmitter<number>();
 
-  time: string = '';
-  selectedVehicle: string = '';
-  timeValid: boolean = true;
-  carNumber: string = '';
+  public time: string = '';
+  public selectedVehicle: string = '';
+  public carNumber: string = '';
+  public parkingFare: number = 0;
+  public displayParkingFare: boolean = false;
+  public timeValid: boolean = true;
 
-  submitForm() {
+  private sub: Subject<void> = new Subject<void>();
+
+  constructor(private readonly apiService: ApiService) {}
+
+  ngOnDestroy(): void {
+    this.sub.next();
+    this.sub.complete();
+  }
+
+  public submitForm() {
     this.validateTime();
-
-    if (this.timeValid) {
-      if (this.sectionName === 'Check-In') {
-        // Handle Check-In logic
-      } else if (this.sectionName === 'Check-Out') {
-        // Handle Check-Out logic
-      }
-    } else {
-      // Handle invalid time input
+    if (!this.timeValid) {
       alert('Please enter a valid time in "hh:mm" format.');
+      return;
+    }
+    if (this.sectionName === 'Check-In Section') {
+      this.sendCheckInRequest();
+    } else if (this.sectionName === 'Check-Out Section') {
+      this.sendCheckOutRequest();
     }
   }
 
-  getCurrentTime() {
+  public getCurrentTime() {
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     this.time = `${hours}:${minutes}`;
   }
 
-  validateTime() {
+  private validateTime() {
     const timePattern = /^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]/;
     this.timeValid = timePattern.test(this.time);
+  }
+
+  private sendCheckInRequest() {
+    const checkInData = {
+      checkInTime: this.time,
+      vehicleType: this.selectedVehicle,
+      vehicleNumber: this.carNumber,
+    };
+    this.apiService
+      .saveCheckInStatus(checkInData)
+      .pipe(takeUntil(this.sub))
+      .subscribe((status) => {
+        console.log('Check In API Status: ', status);
+      });
+  }
+
+  private sendCheckOutRequest() {
+    const checkOutData = {
+      checkOutTime: this.time,
+      vehicleNumber: this.carNumber,
+    };
+    this.apiService
+      .getParkingFare(checkOutData)
+      .pipe(takeUntil(this.sub))
+      .subscribe((fare: number) => {
+        this.fareCalculated.emit(fare);
+      });
   }
 }

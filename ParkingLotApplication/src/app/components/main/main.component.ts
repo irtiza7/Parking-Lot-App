@@ -8,4 +8,10 @@ import { Component } from '@angular/core';
 export class MainComponent {
   public checkInName: string = 'Check-In Section';
   public checkOutName: string = 'Check-Out Section';
+  public fare = -1;
+
+  public displayFare(event: any) {
+    console.log(event);
+    this.fare = event;
+  }
 }
